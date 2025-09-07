@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization; // Kell a tizedespontok helyes kezeléséhez
+using System.Globalization;
 
 namespace JLolo
 {
@@ -8,101 +8,113 @@ namespace JLolo
     {
         public static void Main(string[] args)
         {
-            const string OPERATORS = "*/+-";
-
             Console.WriteLine("Számoljunk:");
 
             string input = Console.ReadLine().Replace(" ", "");
 
-            ProcessInput(OPERATORS, input);
+            Console.WriteLine(CalculateResult(input));
         }
 
-        private static void ProcessInput(string operators, string input)
+        private static double CalculateResult(string input)
         {
-            char[] operatorChars = operators.ToCharArray();
-            string[] numsAsStrings = input.Split(operatorChars);
+            Queue<object> nums = new Queue<object>();
+            Stack<char> operators = new Stack<char>();
 
-            List<double> numbers = new List<double>();
-            
-            foreach (string numStr in numsAsStrings)
+            for (int i = 0; i < input.Length; i++)
                 {
-                numbers.Add(Convert.ToDouble(numStr));
-                }
+                int startIndex = i;
 
-            List<char> operatorSymbols = new List<char>();
-
-            foreach (char c in input)
-                {
-                if (findOperator(operators, c))
+                if (char.IsDigit(input[i]))
                     {
-                    operatorSymbols.Add(c);
-                    }
-                }
-
-            double finalResult = CalculateResult(operatorSymbols, numbers);
-            Console.WriteLine($"\nA végeredmény: {finalResult}");
-        }
-
-        private static double CalculateResult(List<char> operatorSymbols, List<double> numbers)
-        {
-            for (int i = 0; i < operatorSymbols.Count; i++)
-                {
-                if (operatorSymbols[i] == '*' || operatorSymbols[i] == '/')
-                    {
-                    if (numbers[i + 1] == 0 && operatorSymbols[i] == '/')
+                    while (i < input.Length && (char.IsDigit(input[i]) || input[i] == '.'))
                         {
-                        Console.WriteLine("0 nem osztunk!!!");
-                        return 0;
+                        i++;
                         }
 
-                    double result;
-
-                    if (operatorSymbols[i] == '*')
-                        {
-                        result = numbers[i] * numbers[i + 1];
-                        }
-                    else
-                        {
-                        result = numbers[i] / numbers[i + 1];
-                        }
-
-                    numbers[i] = result;
-
-                    numbers.RemoveAt(i + 1);
-                    operatorSymbols.RemoveAt(i);
-
+                    nums.Enqueue(double.Parse(input.Substring(startIndex, i - startIndex), CultureInfo.InvariantCulture));
                     i--;
                     }
+                else
+                    {
+                    char op1 = input[i];
+                    while (operators.Count > 0 && GetPrecedence(operators.Peek()) >= GetPrecedence(op1))
+                        {
+                        nums.Enqueue(operators.Pop());
+                        }
 
+                    operators.Push(op1);
+                    }
                 }
-            
-            double finalResult = numbers[0];
-            
-            for (int i = 0; i < operatorSymbols.Count; i++)
+
+            while (operators.Count > 0)
                 {
-                if (operatorSymbols[i] == '+')
+                nums.Enqueue(operators.Pop());
+                }
+
+            Stack<double> evaluationStack = new Stack<double>();
+
+            while (nums.Count > 0)
+                {
+                object item = nums.Dequeue();
+                
+                if (item is double)
                     {
-                    finalResult += numbers[i + 1];
+                    evaluationStack.Push((double)item);
                     }
-                else 
+                else if (item is char)
                     {
-                    finalResult -= numbers[i + 1];
+                    double rightOperand = evaluationStack.Pop();
+                    double leftOperand = evaluationStack.Pop();
+
+                    switch ((char)item)
+                        {
+                            case '+':
+                                double resultPlus = leftOperand + rightOperand;
+                                evaluationStack.Push(resultPlus);
+                                break;
+                            case '-':
+                                double resultMinus = leftOperand - rightOperand;
+                                evaluationStack.Push(resultMinus);
+                                break;
+                            case '*':
+                                double resultMultiply = leftOperand * rightOperand;
+                                evaluationStack.Push(resultMultiply);
+                                break;
+
+                            case '/':
+                                if (rightOperand == 0)
+                                    {
+                                    Console.WriteLine("Nullával nem lehet osztani!");
+                                    return 0;
+                                    }
+
+                                double resultDivide = leftOperand / rightOperand;
+                                evaluationStack.Push(resultDivide);
+                                break;
+                        }
                     }
                 }
 
+            double finalResult = evaluationStack.Pop();
             return finalResult;
         }
 
-        private static bool findOperator(string operators, char findElements)
+        private static int GetPrecedence(char op)
         {
-            foreach (char c in operators)
+            if (op == '*' || op == '/')
                 {
-                if (c == findElements)
-                    {
-                    return true;
-                    }
+                return 2;
                 }
-            return false;
+            else if (op == '+' || op == '-')
+
+                {
+                return 1;
+                }
+
+            return 0;
         }
     }
 }
+//Régi kod kvadratikus, O(n²)
+// Uj kod  konstans idejűek, O(1)
+// Shunting-yard https://en.wikipedia.org/wiki/Shunting_yard_algorithm
